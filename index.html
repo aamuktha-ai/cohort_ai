@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CohortAI Prototype</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="sidebar">
+        <div>
+          <p class="eyebrow">UACC Research AI</p>
+          <h1>CohortAI</h1>
+          <p class="lede">
+            Data dictionary comparison for variable descriptions, coding, units, endpoints,
+            and harmonization feasibility across cancer research cohorts.
+          </p>
+        </div>
+
+        <section class="status-panel" aria-labelledby="workflow-title">
+          <h2 id="workflow-title">Workflow</h2>
+          <ol>
+            <li>Define question</li>
+            <li>Paste data dictionaries</li>
+            <li>Compare variable descriptions</li>
+            <li>Export feasibility report</li>
+          </ol>
+        </section>
+      </aside>
+
+      <section class="workspace">
+        <header class="workspace-header">
+          <div>
+            <p class="eyebrow" id="modeLabel">Data dictionary comparability</p>
+            <h2 id="pageTitle">Compare variables across cohort data dictionaries</h2>
+          </div>
+          <button class="secondary-button" id="loadSampleButton" type="button">Load Sample</button>
+        </header>
+
+        <form class="analysis-form" id="analysisForm">
+          <label>
+            Scientific question
+            <textarea id="question" rows="3" placeholder="Example: Are response, survival, treatment, and immune-signature variables defined similarly enough across these melanoma cohorts?"></textarea>
+          </label>
+
+          <div class="field-grid">
+            <label>
+              Primary disease area
+              <input id="diseaseArea" placeholder="Melanoma, breast cancer, AML..." />
+            </label>
+            <label>
+              Desired analysis
+              <select id="analysisGoal">
+                <option value="direct-comparison">Direct comparison</option>
+                <option value="harmonized-pooling">Harmonized pooling</option>
+                <option value="federated-analysis">Federated analysis</option>
+              </select>
+            </label>
+          </div>
+
+          <label>
+            Investigator data dictionary
+            <input id="localDictionaryFile" class="file-input" type="file" accept=".txt,.csv,.tsv,.json,.md" />
+            <span class="file-status" id="localFileStatus">No file uploaded</span>
+            <textarea id="localDataset" rows="7" placeholder="Paste variable names and descriptions from the local cohort data dictionary. Example: response_recist = best overall response by RECIST 1.1; pfs_months = months from treatment start to progression or death."></textarea>
+          </label>
+
+          <label>
+            Candidate public cohort data dictionaries
+            <input id="candidateDictionaryFiles" class="file-input" type="file" accept=".txt,.csv,.tsv,.json,.md" multiple />
+            <span class="file-status" id="candidateFileStatus">No files uploaded</span>
+            <textarea id="candidateDatasets" rows="8" placeholder="Paste one public cohort data dictionary per block or line. Include variable name, description, allowed values, units, missingness notes, endpoint definitions, and accession if known."></textarea>
+          </label>
+
+          <label>
+            Target variables to compare
+            <textarea id="variables" rows="4" placeholder="response_recist, treatment_line, stage, pfs_months, os_months, immune_signature_score, assay_platform..."></textarea>
+          </label>
+
+          <div class="actions">
+            <button class="primary-button" type="submit">Run Feasibility Assessment</button>
+            <button class="secondary-button" id="clearButton" type="button">Clear</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="report-panel" aria-live="polite">
+        <div class="report-header">
+          <div>
+            <p class="eyebrow">Structured output</p>
+            <h2>Feasibility Report</h2>
+          </div>
+          <button class="secondary-button" id="downloadButton" type="button" disabled>Download JSON</button>
+        </div>
+
+        <div id="emptyState" class="empty-state">
+          <strong>No assessment yet</strong>
+          <p>Run an analysis to compare variable definitions, coding, units, and harmonization risk.</p>
+        </div>
+
+        <div id="report" class="report hidden"></div>
+      </section>
+    </main>
+
+    <script type="module" src="/src/app.js"></script>
+  </body>
+</html>

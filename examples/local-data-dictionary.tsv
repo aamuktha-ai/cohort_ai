@@ -1,0 +1,4 @@
+variable	description	values	units
+age_at_tx	Age at anti-PD-1 treatment start	continuous	years
+response_recist	Best overall response by RECIST 1.1	CR, PR, SD, PD	none
+pfs_months	Time from anti-PD-1 start to progression or death	continuous	months

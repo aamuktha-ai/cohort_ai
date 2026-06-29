@@ -1,0 +1,4 @@
+variable	description	values	units
+age	Age at treatment initiation	continuous	years
+response	RECIST response category	CR, PR, SD, PD	none
+pfs	Progression-free survival from treatment start	continuous	months
