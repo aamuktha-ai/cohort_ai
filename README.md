@@ -1,26 +1,26 @@
 # CohortAI
 
-CohortAI is a small prototype for comparing cohort data dictionaries. The goal is to help researchers decide whether variables from different cancer research cohorts are similar enough to compare directly, harmonize for pooled analysis, or keep separate.
+CohortAI is a prototype I am building to compare cohort data dictionaries. The main idea is to make it easier to see whether variables from different cancer research cohorts are defined similarly enough to compare or combine.
 
-Right now the app runs locally in the browser. It does not call a live LLM yet. The current scoring logic is a placeholder so I can test the workflow before connecting Claude, Llama, or another model endpoint.
+For now, this is a local browser app. It does not use a live LLM yet. The scoring is still a basic placeholder, but the workflow is set up so a real model can be added later.
 
-## What It Does
+## What It Does Right Now
 
-- Upload or paste a local/investigator data dictionary.
-- Upload or paste one or more public cohort data dictionaries.
-- List the target variables that need comparison.
-- Generate a feasibility report about:
+- Lets you upload or paste an investigator/local data dictionary.
+- Lets you upload or paste one or more public cohort data dictionaries.
+- Lets you list the variables you care about comparing.
+- Gives a simple feasibility report that looks at:
   - variable name overlap
-  - variable description similarity
-  - coding/value set compatibility
+  - variable descriptions
+  - coding and allowed values
   - units and time anchors
-  - missingness and availability
-  - harmonization flags
-- Download the report as JSON.
+  - missingness or availability issues
+  - possible harmonization problems
+- Lets you download the report as a JSON file.
 
-## Run Locally
+## How To Run It
 
-From this folder:
+From this project folder, run:
 
 ```bash
 npm run dev
@@ -32,14 +32,14 @@ Then open:
 http://localhost:5173
 ```
 
-## Example Files
+## Example Data Dictionaries
 
-The `examples/` folder has two small TSV data dictionaries that can be uploaded into the app:
+I added two small example files in the `examples/` folder so the upload feature can be tested quickly:
 
 - `examples/local-data-dictionary.tsv`
 - `examples/public-data-dictionary.tsv`
 
-## Project Structure
+## Files
 
 ```text
 .
@@ -55,14 +55,28 @@ The `examples/` folder has two small TSV data dictionaries that can be uploaded 
 └── README.md
 ```
 
+## Notes
+
+This is still an early version. The app is mainly meant to show the workflow:
+
+1. Add data dictionaries.
+2. Compare the variable descriptions.
+3. Flag differences in coding, units, endpoints, and missingness.
+4. Produce a report that can guide harmonization decisions.
+
+## Next Things To Add
+
+- Better CSV/TSV parsing instead of just reading uploaded files as text.
+- A variable crosswalk table in the report.
+- A real LLM comparison step in `src/modelAdapters.js`.
+- Saved projects or previous runs.
+- Tests once the comparison logic is more stable.
+
 ## GitHub Setup
 
-If this folder is not connected to GitHub yet:
+If this folder is not connected to GitHub yet, create an empty repo on GitHub first. Do not add a README or `.gitignore` on GitHub because this project already has those files.
 
-1. Create a new empty repository on GitHub.
-2. Do not add a README, license, or `.gitignore` on GitHub if you are pushing this existing folder.
-3. Copy the repository URL.
-4. Run these commands from this project folder:
+Then run:
 
 ```bash
 git add .
@@ -71,12 +85,4 @@ git remote add origin https://github.com/YOUR-USERNAME/YOUR-REPO-NAME.git
 git push -u origin main
 ```
 
-Replace `YOUR-USERNAME/YOUR-REPO-NAME` with the real GitHub repo path.
-
-## Next Steps
-
-- Add better parsing for CSV/TSV data dictionaries.
-- Add a real variable crosswalk table to the report.
-- Add LLM-based extraction and comparison through `src/modelAdapters.js`.
-- Add project history so previous comparisons can be saved.
-- Add tests once the scoring logic becomes less experimental.
+Replace `YOUR-USERNAME/YOUR-REPO-NAME` with the actual repo URL.
