@@ -72,17 +72,4 @@ This is still an early version. The app is mainly meant to show the workflow:
 - Saved projects or previous runs.
 - Tests once the comparison logic is more stable.
 
-## GitHub Setup
 
-If this folder is not connected to GitHub yet, create an empty repo on GitHub first. Do not add a README or `.gitignore` on GitHub because this project already has those files.
-
-Then run:
-
-```bash
-git add .
-git commit -m "Add CohortAI prototype"
-git remote add origin https://github.com/YOUR-USERNAME/YOUR-REPO-NAME.git
-git push -u origin main
-```
-
-Replace `YOUR-USERNAME/YOUR-REPO-NAME` with the actual repo URL.
