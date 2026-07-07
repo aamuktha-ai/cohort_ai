@@ -32,6 +32,27 @@ Then open:
 http://localhost:5173
 ```
 
+## Sharing It
+
+The easiest way to show this to other people is GitHub Pages.
+
+After the project is pushed to GitHub:
+
+1. Open the GitHub repo.
+2. Go to **Settings**.
+3. Click **Pages** in the left sidebar.
+4. Under **Build and deployment**, choose **Deploy from a branch**.
+5. Pick the `main` branch and `/root`.
+6. Click **Save**.
+
+GitHub will give you a public link after it finishes deploying. It will look something like:
+
+```text
+https://aamuktha-ai.github.io/cohort_ai/
+```
+
+This version is still just a front-end prototype, so anything uploaded stays in the browser session and is not saved to a server.
+
 ## Example Data Dictionaries
 
 I added two small example files in the `examples/` folder so the upload feature can be tested quickly:
