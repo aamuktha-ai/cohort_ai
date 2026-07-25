@@ -132,6 +132,13 @@ h1 {
   margin-bottom: 24px;
 }
 
+.report-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .analysis-form {
   display: grid;
   gap: 18px;
@@ -155,6 +162,23 @@ textarea {
   background: #fbfcfc;
   color: #1d2528;
   font-weight: 500;
+}
+
+.attestation {
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 10px;
+  padding: 12px;
+  background: #f7faf9;
+  border: 1px solid #dfe7e8;
+  border-radius: 8px;
+  font-weight: 650;
+}
+
+.attestation input {
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
 }
 
 .file-input {
@@ -321,6 +345,122 @@ textarea:focus {
   background: #00747c;
 }
 
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.summary-item {
+  display: grid;
+  gap: 6px;
+  min-height: 88px;
+  align-content: start;
+  border: 1px solid #dfe7e8;
+  border-radius: 8px;
+  padding: 10px;
+  background: #fbfcfc;
+}
+
+.summary-item strong {
+  font-size: 1.45rem;
+}
+
+.summary-item span:last-child {
+  color: #617077;
+  font-weight: 750;
+}
+
+.match-badge {
+  display: inline-flex;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 5px 8px;
+  font-size: 0.76rem;
+  font-weight: 850;
+  background: #edf2f2;
+  color: #35464b;
+}
+
+.match-badge.direct {
+  background: #dff5ea;
+  color: #0f6540;
+}
+
+.match-badge.analogous {
+  background: #e4f1fb;
+  color: #155b84;
+}
+
+.match-badge.partial {
+  background: #fff0c7;
+  color: #785500;
+}
+
+.match-badge.supplemental {
+  background: #f0e9fb;
+  color: #58407d;
+}
+
+.match-badge.no-match,
+.match-badge.needs-review {
+  background: #fde4e4;
+  color: #8a2c2c;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 820px;
+}
+
+th,
+td {
+  padding: 10px;
+  border-bottom: 1px solid #dfe7e8;
+  text-align: left;
+  vertical-align: top;
+  color: #344247;
+  font-size: 0.88rem;
+}
+
+th {
+  background: #f1f6f6;
+  font-weight: 850;
+}
+
+.rationale-row td {
+  color: #617077;
+  background: #fbfcfc;
+  font-size: 0.84rem;
+}
+
+.provenance-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.provenance-list div {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 10px;
+}
+
+.provenance-list dt {
+  color: #617077;
+  font-weight: 800;
+}
+
+.provenance-list dd {
+  margin: 0;
+  color: #344247;
+}
+
 @media (max-width: 1100px) {
   .app-shell {
     grid-template-columns: 260px 1fr;
@@ -349,6 +489,11 @@ textarea:focus {
   }
 
   .dimension-row {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-grid,
+  .provenance-list div {
     grid-template-columns: 1fr;
   }
 }

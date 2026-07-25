@@ -22,9 +22,9 @@
           <h2 id="workflow-title">Workflow</h2>
           <ol>
             <li>Define question</li>
-            <li>Paste data dictionaries</li>
-            <li>Compare variable descriptions</li>
-            <li>Export feasibility report</li>
+            <li>Upload dictionaries</li>
+            <li>Generate crosswalk</li>
+            <li>Review match types</li>
           </ol>
         </section>
       </aside>
@@ -78,8 +78,13 @@
             <textarea id="variables" rows="4" placeholder="response_recist, treatment_line, stage, pfs_months, os_months, immune_signature_score, assay_platform..."></textarea>
           </label>
 
+          <label class="attestation">
+            <input id="userAttestation" type="checkbox" />
+            <span>I confirm I am authorized to use these data dictionaries for this comparison.</span>
+          </label>
+
           <div class="actions">
-            <button class="primary-button" type="submit">Run Feasibility Assessment</button>
+            <button class="primary-button" type="submit">Generate Crosswalk</button>
             <button class="secondary-button" id="clearButton" type="button">Clear</button>
           </div>
         </form>
@@ -91,12 +96,15 @@
             <p class="eyebrow">Structured output</p>
             <h2>Feasibility Report</h2>
           </div>
-          <button class="secondary-button" id="downloadButton" type="button" disabled>Download JSON</button>
+          <div class="report-actions">
+            <button class="secondary-button" id="downloadCrosswalkButton" type="button" disabled>Crosswalk CSV</button>
+            <button class="secondary-button" id="downloadButton" type="button" disabled>Report JSON</button>
+          </div>
         </div>
 
         <div id="emptyState" class="empty-state">
           <strong>No assessment yet</strong>
-          <p>Run an analysis to compare variable definitions, coding, units, and harmonization risk.</p>
+          <p>Generate a crosswalk to compare variable definitions, coding, units, and harmonization risk.</p>
         </div>
 
         <div id="report" class="report hidden"></div>

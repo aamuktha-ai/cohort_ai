@@ -1,7 +1,5 @@
 node_modules/
-.DS_Store
-*.log
 .env
 .env.local
-dist/
-coverage/
+validation/results/
+.DS_Store

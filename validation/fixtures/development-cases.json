@@ -1,0 +1,104 @@
+{
+  "fixtureVersion": "1.0.0",
+  "purpose": "Deterministic engineering regression fixtures. These cases demonstrate expected rubric behavior but are not an external expert-adjudicated validation benchmark.",
+  "cases": [
+    {
+      "id": "easy-direct-age-years",
+      "difficulty": "easy-concordant",
+      "input": {
+        "question": "Can age be compared?",
+        "diseaseArea": "Cancer",
+        "analysisGoal": "direct-comparison",
+        "variables": "age",
+        "localDataset": "Variable\tDescription\tUnits\nage\tAge at baseline visit\tyears",
+        "candidateDatasets": "Variable\tDescription\tUnits\nage_at_visit\tAge at baseline visit\tyears",
+        "userAttestation": true
+      },
+      "expected": { "matchType": "Direct", "recommendation": "Direct comparison", "sampleOverlapRisk": "None expected" }
+    },
+    {
+      "id": "moderate-analogous-race-coding",
+      "difficulty": "moderate",
+      "input": {
+        "question": "Can race be pooled?",
+        "diseaseArea": "Cancer",
+        "analysisGoal": "harmonized-pooling",
+        "variables": "race",
+        "localDataset": "Variable\tDescription\tAllowed values\nrace\tSelf-reported race\t1=White; 2=Black; 3=Asian; 4=Other",
+        "candidateDatasets": "Variable\tDescription\tAllowed values\nrace_multiselect\tSelf-reported race, multi-select\t0/1 for each category",
+        "userAttestation": true
+      },
+      "expected": { "matchType": "Analogous", "recommendation": "Harmonized pooling", "sampleOverlapRisk": "None expected" }
+    },
+    {
+      "id": "hard-partial-moca-subset",
+      "difficulty": "hard-discordant",
+      "input": {
+        "question": "Can MoCA be compared?",
+        "diseaseArea": "Cancer",
+        "analysisGoal": "harmonized-pooling",
+        "variables": "moca",
+        "localDataset": "Variable\tDescription\tUnits\nmoca\tMoCA total score at baseline\t0-30 score",
+        "candidateDatasets": "Variable\tDescription\tUnits\nmoca_total\tMoCA total score, only available for Phase 2 subset\t0-30 score",
+        "userAttestation": true
+      },
+      "expected": { "matchType": "Partial", "recommendation": "Not poolable without major review", "sampleOverlapRisk": "None expected" }
+    },
+    {
+      "id": "edge-no-match-requested-variable",
+      "difficulty": "edge-case",
+      "input": {
+        "question": "Can a MoCA outcome be compared?",
+        "diseaseArea": "Cancer",
+        "analysisGoal": "harmonized-pooling",
+        "variables": "moca",
+        "localDataset": "Variable\tDescription\nmoca\tMontreal Cognitive Assessment total score",
+        "candidateDatasets": "Variable\tDescription\nage\tAge at baseline in years",
+        "userAttestation": true
+      },
+      "expected": { "matchType": "No match", "recommendation": "Not poolable without major review", "sampleOverlapRisk": "None expected" }
+    },
+    {
+      "id": "edge-supplemental-inferred-variable",
+      "difficulty": "edge-case",
+      "input": {
+        "question": "Assess available constructs.",
+        "diseaseArea": "Cancer",
+        "analysisGoal": "harmonized-pooling",
+        "variables": "",
+        "localDataset": "Variable\tDescription\nmindcrowd_task\tUnique cohort-specific cognitive task",
+        "candidateDatasets": "Variable\tDescription\nage\tAge at baseline in years",
+        "userAttestation": true
+      },
+      "expected": { "matchType": "Supplemental", "recommendation": "Not poolable without major review", "sampleOverlapRisk": "None expected" }
+    },
+    {
+      "id": "edge-needs-review-unclear-definition",
+      "difficulty": "edge-case",
+      "input": {
+        "question": "Can this biomarker be compared?",
+        "diseaseArea": "Cancer",
+        "analysisGoal": "harmonized-pooling",
+        "variables": "experimental marker",
+        "localDataset": "Variable\tDescription\nexperimental_marker\tExperimental biomarker assay result, unit unclear",
+        "candidateDatasets": "Variable\tDescription\nexperimental_marker\tExperimental biomarker result, coding not specified",
+        "userAttestation": true
+      },
+      "expected": { "matchType": "Needs review", "recommendation": "Not poolable without major review", "sampleOverlapRisk": "None expected" }
+    },
+    {
+      "id": "overlap-likely-linked-participants",
+      "difficulty": "hard-discordant",
+      "input": {
+        "question": "Can age be compared?",
+        "diseaseArea": "Cancer",
+        "analysisGoal": "direct-comparison",
+        "variables": "age",
+        "localDataset": "Variable\tDescription\nage\tAge at baseline in years; participants may be linked records",
+        "candidateDatasets": "Variable\tDescription\nage\tAge at baseline in years; shared participants from the same registry",
+        "userAttestation": true
+      },
+      "expected": { "matchType": "Direct", "recommendation": "Direct comparison", "sampleOverlapRisk": "Likely" }
+    }
+  ]
+}

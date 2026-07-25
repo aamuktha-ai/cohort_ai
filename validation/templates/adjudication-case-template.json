@@ -1,0 +1,19 @@
+{
+  "instructions": "Replace the example values with two independent expert labels. Run npm run adjudication -- path/to/this-file.json. The command exits nonzero when match-type kappa is below 0.60.",
+  "cases": [
+    {
+      "id": "example-001",
+      "difficulty": "easy-concordant | moderate | hard-discordant | edge-case",
+      "adjudicatorA": {
+        "matchType": "Direct",
+        "sampleOverlapRisk": "None expected",
+        "recommendation": "Direct comparison"
+      },
+      "adjudicatorB": {
+        "matchType": "Direct",
+        "sampleOverlapRisk": "None expected",
+        "recommendation": "Direct comparison"
+      }
+    }
+  ]
+}

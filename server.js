@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
+import { runModelAssessment } from "./src/modelAdapters.js";
 
 const root = process.cwd();
 const port = Number(process.env.PORT || 5173);
@@ -15,6 +16,21 @@ const types = {
   ".png": "image/png"
 };
 
+function sendJson(res, status, payload) {
+  res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
+  res.end(JSON.stringify(payload));
+}
+
+async function readJsonBody(req) {
+  const chunks = [];
+
+  for await (const chunk of req) {
+    chunks.push(chunk);
+  }
+
+  return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
+}
+
 function resolvePath(url) {
   const pathname = decodeURIComponent(new URL(url, `http://localhost:${port}`).pathname);
   const target = pathname === "/" ? "/index.html" : pathname;
@@ -23,14 +39,29 @@ function resolvePath(url) {
 }
 
 createServer(async (req, res) => {
+  const url = new URL(req.url || "/", `http://localhost:${port}`);
   try {
+    if (req.method === "POST" && url.pathname === "/api/analyze") {
+      const input = await readJsonBody(req);
+      const result = await runModelAssessment(input);
+      sendJson(res, 200, result);
+      return;
+    }
+
     const filePath = resolvePath(req.url || "/");
     const data = await readFile(filePath);
     res.writeHead(200, {
       "Content-Type": types[extname(filePath)] || "application/octet-stream"
     });
     res.end(data);
-  } catch {
+  } catch (error) {
+    if (url.pathname === "/api/analyze") {
+      sendJson(res, error.statusCode || 500, {
+        error: error.message || "Model assessment failed"
+      });
+      return;
+    }
+
     res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
     res.end("Not found");
   }
