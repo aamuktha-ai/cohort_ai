@@ -6,28 +6,28 @@
     <title>CohortAI Prototype</title>
     <link rel="stylesheet" href="src/styles.css" />
   </head>
-  <body>
+  <body data-reference-cohort="PAN">
     <main class="app-shell">
       <aside class="sidebar">
         <div>
           <p class="eyebrow">UACC Research AI</p>
-          <h1>CohortAI</h1>
+          <h1>CohortAI PAN</h1>
           <p class="lede">
-            Data dictionary comparison for variable descriptions, coding, units, endpoints,
-            and harmonization feasibility across cancer research cohorts.
+            Compare an investigator data dictionary against the fixed Precision Aging Network reference dictionary.
           </p>
         </div>
 
         <nav class="mode-tabs" aria-label="CohortAI versions">
-          <a class="mode-tab active" href="index.html">Multi-cohort comparison</a>
-          <a class="mode-tab" href="pan.html">PAN reference comparison</a>
+          <a class="mode-tab" href="index.html">Multi-cohort comparison</a>
+          <a class="mode-tab active" href="pan.html">PAN reference comparison</a>
         </nav>
 
         <section class="status-panel" aria-labelledby="workflow-title">
           <h2 id="workflow-title">Workflow</h2>
           <ol>
             <li>Define question</li>
-            <li>Upload dictionaries</li>
+            <li>Upload investigator dictionary</li>
+            <li>Compare against PAN</li>
             <li>Generate crosswalk</li>
             <li>Review match types</li>
           </ol>
@@ -37,8 +37,8 @@
       <section class="workspace">
         <header class="workspace-header">
           <div>
-            <p class="eyebrow" id="modeLabel">Data dictionary comparability</p>
-            <h2 id="pageTitle">Compare variables across cohort data dictionaries</h2>
+            <p class="eyebrow" id="modeLabel">Fixed reference comparison</p>
+            <h2 id="pageTitle">Compare your data dictionary with PAN</h2>
           </div>
           <button class="secondary-button" id="loadSampleButton" type="button">Load Sample</button>
         </header>
@@ -71,12 +71,15 @@
             <textarea id="localDataset" rows="7" placeholder="Paste variable names and descriptions from the local cohort data dictionary. Example: response_recist = best overall response by RECIST 1.1; pfs_months = months from treatment start to progression or death."></textarea>
           </label>
 
-          <label>
-            Candidate public cohort data dictionaries
-            <input id="candidateDictionaryFiles" class="file-input" type="file" accept=".txt,.csv,.tsv,.json,.yaml,.yml,.md" multiple />
-            <span class="file-status" id="candidateFileStatus">No files uploaded</span>
-            <textarea id="candidateDatasets" rows="8" placeholder="Paste one public cohort data dictionary per block or line. Include variable name, description, allowed values, units, missingness notes, endpoint definitions, and accession if known."></textarea>
-          </label>
+          <section class="reference-cohort" aria-labelledby="pan-reference-title">
+            <div>
+              <p class="eyebrow">Fixed candidate cohort</p>
+              <h3 id="pan-reference-title">Precision Aging Network (PAN)</h3>
+              <p>Versioned PAN data-dictionary metadata is bundled with this tool and is used for every comparison.</p>
+            </div>
+            <span class="file-status" id="panReferenceStatus">Loading PAN reference dictionary...</span>
+          </section>
+          <textarea id="candidateDatasets" class="hidden" aria-hidden="true" tabindex="-1"></textarea>
 
           <label>
             Target variables to compare

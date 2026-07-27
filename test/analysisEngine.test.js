@@ -4,6 +4,7 @@ import test from "node:test";
 import { analyzeFeasibility, matchTypes } from "../src/analysisEngine.js";
 
 const fixturePath = new URL("../validation/fixtures/development-cases.json", import.meta.url);
+const panReferencePath = new URL("../reference-data/PAN_Data_Dictionary.csv", import.meta.url);
 const fixtures = JSON.parse(await readFile(fixturePath, "utf8"));
 
 test("development fixtures cover every CohortAI match type", () => {
@@ -155,6 +156,35 @@ test("weak token overlap is not reported as a collected target variable", () => 
 
   assert.equal(report.crosswalk[0].matchType, "No match");
   assert.equal(report.crosswalk[0].publicVariable, "Not found");
+});
+
+test("bundled PAN reference dictionary supports fixed-reference comparisons", async () => {
+  const panDictionary = await readFile(panReferencePath, "utf8");
+  const report = analyzeFeasibility({
+    mode: "pan-reference",
+    referenceCohort: "PAN",
+    question: "Compare core cognitive and demographic variables with PAN.",
+    diseaseArea: "Aging",
+    analysisGoal: "harmonized-pooling",
+    variables: "age, education, moca, trail making test a",
+    localDataset: [
+      "variable,description,units",
+      "age,Age at baseline visit,years",
+      "education_years,Years of formal education,years",
+      "moca_score,Montreal Cognitive Assessment total score,0-30 score",
+      "trail_a_seconds,Trail Making Test Part A completion time,seconds"
+    ].join("\n"),
+    candidateDatasets: `### Precision Aging Network (PAN)\n${panDictionary}`,
+    userAttestation: true
+  });
+
+  assert.equal(report.candidateCount, 1);
+  assert.equal(report.provenance.dictionaryParsing[1].recordCount, 3086);
+  assert.equal(report.crosswalk[0].candidateCohort, "Precision Aging Network (PAN)");
+  assert.equal(report.crosswalk[0].publicVariable, "age_hml");
+  assert.equal(report.crosswalk[1].publicVariable, "edu_yrs_hml");
+  assert.equal(report.crosswalk[2].publicVariable, "moca_total");
+  assert.equal(report.crosswalk[3].matchType, "No match");
 });
 
 for (const fixture of fixtures.cases) {

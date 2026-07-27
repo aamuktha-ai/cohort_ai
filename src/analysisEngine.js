@@ -1,4 +1,7 @@
-export const pipelineVersion = "cohortai-prototype-0.6";
+export const pipelineVersion = "cohortai-prototype-0.7";
+
+const dictionaryRecordCache = new Map();
+const candidateDictionaryCache = new Map();
 
 const matchDefinitions = {
   Direct: {
@@ -556,17 +559,28 @@ function inferMeasurementType(text) {
   return "unknown";
 }
 
-function parseDictionary(text, cohortLabel) {
+export function parseDictionary(text, cohortLabel) {
   const trimmed = String(text || "").trim();
   if (!trimmed) return [];
 
+  const cacheKey = `${cohortLabel}\u0000${trimmed}`;
+  if (dictionaryRecordCache.has(cacheKey)) return dictionaryRecordCache.get(cacheKey);
+
   const jsonRows = parseJsonDictionary(trimmed, cohortLabel);
-  if (jsonRows.length) return jsonRows;
+  if (jsonRows.length) {
+    dictionaryRecordCache.set(cacheKey, jsonRows);
+    return jsonRows;
+  }
 
   const yamlRows = parseYamlSchemaDictionary(trimmed, cohortLabel);
-  if (yamlRows.length) return yamlRows;
+  if (yamlRows.length) {
+    dictionaryRecordCache.set(cacheKey, yamlRows);
+    return yamlRows;
+  }
 
-  return parseStructuredDictionary(trimmed, cohortLabel);
+  const records = parseStructuredDictionary(trimmed, cohortLabel);
+  dictionaryRecordCache.set(cacheKey, records);
+  return records;
 }
 
 function describeDictionaryParsing(text, cohortLabel) {
@@ -600,6 +614,9 @@ function describeDictionaryParsing(text, cohortLabel) {
 }
 
 function parseCandidateDictionaries(text) {
+  const cacheKey = String(text || "");
+  if (candidateDictionaryCache.has(cacheKey)) return candidateDictionaryCache.get(cacheKey);
+
   const lines = rawLines(text);
   const blocks = [];
   let label = "Candidate cohort";
@@ -627,11 +644,13 @@ function parseCandidateDictionaries(text) {
   });
   saveBlock();
 
-  return blocks.length ? blocks : [{
+  const dictionaries = blocks.length ? blocks : [{
     label: "Candidate cohort",
     sourceText: text,
     records: parseDictionary(text, "Candidate cohort")
   }];
+  candidateDictionaryCache.set(cacheKey, dictionaries);
+  return dictionaries;
 }
 
 function scoreRecordAgainstTarget(record, target) {

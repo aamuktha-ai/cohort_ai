@@ -22,6 +22,24 @@ For now, this is a local browser app with an optional LLM backend. If no model i
 - Adds basic provenance information.
 - Lets you download the full report as JSON and the variable crosswalk as CSV.
 
+## PAN Reference Version
+
+`pan.html` is a separate CohortAI version for a data website where the candidate cohort is always the Precision Aging Network (PAN). Users upload only their investigator dictionary; the PAN candidate dictionary is bundled as metadata in `reference-data/PAN_Data_Dictionary.csv` and is enforced again by the server for future LLM-backed analyses.
+
+The PAN page uses the deterministic comparison engine by default, so it remains responsive when comparing against the full reference dictionary. A secured PAN-aware LLM route can be enabled later without allowing users to replace the fixed candidate cohort.
+
+Open it locally at:
+
+```text
+http://localhost:5173/pan.html
+```
+
+After GitHub Pages deploys it, its sharing URL is:
+
+```text
+https://aamuktha-ai.github.io/cohort_ai/pan.html
+```
+
 ## How To Run It
 
 From this project folder, run:

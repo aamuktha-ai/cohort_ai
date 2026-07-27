@@ -1,4 +1,4 @@
-import { analyzeFeasibility } from "./analysisEngine.js";
+import { analyzeFeasibility, parseDictionary } from "./analysisEngine.js";
 
 const sample = {
   question: "Are response, survival, treatment, and immune-signature variables defined similarly enough across melanoma immunotherapy cohorts for harmonized analysis?",
@@ -9,7 +9,19 @@ const sample = {
   variables: "age, sex, stage, treatment line, RECIST response, progression-free survival, overall survival, immune signature score"
 };
 
+const panReferenceSample = {
+  question: "Which investigator variables can be compared or harmonized with the Precision Aging Network data dictionary?",
+  diseaseArea: "Aging and dementia research",
+  analysisGoal: "harmonized-pooling",
+  localDataset: "local_age: Age at baseline visit in years\nsex: Sex assigned at birth, coded female/male\neducation_years: Years of formal education\nrace: Self-reported race\nmoca_score: Montreal Cognitive Assessment total score, 0-30\ntrail_a_seconds: Trail Making Test Part A completion time in seconds",
+  variables: "age, sex, education, race, moca, trail making test a"
+};
+
 let latestReport = null;
+let panReferenceDictionary = "";
+let panReferenceLoadError = "";
+const panReferenceMode = document.body.dataset.referenceCohort === "PAN";
+const usePanReferenceLlm = document.body.dataset.usePanLlm === "true";
 
 const form = document.querySelector("#analysisForm");
 const report = document.querySelector("#report");
@@ -20,6 +32,7 @@ const localDictionaryFile = document.querySelector("#localDictionaryFile");
 const candidateDictionaryFiles = document.querySelector("#candidateDictionaryFiles");
 const localFileStatus = document.querySelector("#localFileStatus");
 const candidateFileStatus = document.querySelector("#candidateFileStatus");
+const panReferenceStatus = document.querySelector("#panReferenceStatus");
 const fields = {
   question: document.querySelector("#question"),
   diseaseArea: document.querySelector("#diseaseArea"),
@@ -68,6 +81,7 @@ async function handleLocalUpload() {
 }
 
 async function handleCandidateUpload() {
+  if (panReferenceMode) return;
   const files = Array.from(candidateDictionaryFiles.files);
   if (!files.length) return;
 
@@ -79,25 +93,45 @@ async function handleCandidateUpload() {
     : `Uploaded ${files.length} file${files.length === 1 ? "" : "s"}`;
 }
 
+async function loadPanReferenceDictionary() {
+  if (!panReferenceMode) return;
+
+  try {
+    const response = await fetch(new URL("../reference-data/PAN_Data_Dictionary.csv", import.meta.url));
+    if (!response.ok) throw new Error("PAN reference dictionary could not be loaded.");
+    panReferenceDictionary = await response.text();
+    parseDictionary(panReferenceDictionary, "Precision Aging Network (PAN)");
+    fields.candidateDatasets.value = `### Precision Aging Network (PAN)\n${panReferenceDictionary}`;
+    panReferenceStatus.textContent = "PAN reference dictionary loaded and locked for comparison.";
+  } catch {
+    panReferenceLoadError = "The PAN reference dictionary could not be loaded. Refresh the page before running an assessment.";
+    panReferenceStatus.textContent = panReferenceLoadError;
+  }
+}
+
 function loadSample() {
-  Object.entries(sample).forEach(([key, value]) => {
+  const activeSample = panReferenceMode ? panReferenceSample : sample;
+  Object.entries(activeSample).forEach(([key, value]) => {
     fields[key].value = value;
   });
   localDictionaryFile.value = "";
-  candidateDictionaryFiles.value = "";
+  if (candidateDictionaryFiles) candidateDictionaryFiles.value = "";
   localFileStatus.textContent = "Sample dictionary loaded";
-  candidateFileStatus.textContent = "Sample dictionaries loaded";
+  if (candidateFileStatus) candidateFileStatus.textContent = "Sample dictionaries loaded";
   fields.userAttestation.checked = true;
 }
 
 function collectInput() {
   return {
-    mode: "cohort",
+    mode: panReferenceMode ? "pan-reference" : "cohort",
+    referenceCohort: panReferenceMode ? "PAN" : "",
     question: fields.question.value.trim(),
     diseaseArea: fields.diseaseArea.value.trim(),
     analysisGoal: fields.analysisGoal.value,
     localDataset: fields.localDataset.value.trim(),
-    candidateDatasets: fields.candidateDatasets.value.trim(),
+    candidateDatasets: panReferenceMode
+      ? `### Precision Aging Network (PAN)\n${panReferenceDictionary}`
+      : fields.candidateDatasets.value.trim(),
     variables: fields.variables.value.trim(),
     userAttestation: fields.userAttestation.checked
   };
@@ -282,14 +316,14 @@ async function requestLlmReport(input) {
 
 document.querySelector("#loadSampleButton").addEventListener("click", loadSample);
 localDictionaryFile.addEventListener("change", handleLocalUpload);
-candidateDictionaryFiles.addEventListener("change", handleCandidateUpload);
+if (candidateDictionaryFiles) candidateDictionaryFiles.addEventListener("change", handleCandidateUpload);
 
 document.querySelector("#clearButton").addEventListener("click", () => {
   form.reset();
   localDictionaryFile.value = "";
-  candidateDictionaryFiles.value = "";
+  if (candidateDictionaryFiles) candidateDictionaryFiles.value = "";
   localFileStatus.textContent = "No file uploaded";
-  candidateFileStatus.textContent = "No files uploaded";
+  if (candidateFileStatus) candidateFileStatus.textContent = "No files uploaded";
   report.classList.add("hidden");
   emptyState.classList.remove("hidden");
   downloadButton.disabled = true;
@@ -304,13 +338,22 @@ form.addEventListener("submit", async (event) => {
     return;
   }
 
+  if (panReferenceMode && (!panReferenceDictionary || panReferenceLoadError)) {
+    alert(panReferenceLoadError || "The PAN reference dictionary is still loading. Please try again in a moment.");
+    return;
+  }
+
   const input = collectInput();
   const submitButton = form.querySelector("button[type='submit']");
   submitButton.disabled = true;
   submitButton.textContent = "Generating...";
 
   try {
-    latestReport = await requestLlmReport(input);
+    if (panReferenceMode && !usePanReferenceLlm) {
+      latestReport = analyzeFeasibility(input);
+    } else {
+      latestReport = await requestLlmReport(input);
+    }
   } catch {
     latestReport = analyzeFeasibility(input);
   } finally {
@@ -338,3 +381,5 @@ downloadCrosswalkButton.addEventListener("click", () => {
     "text/csv"
   );
 });
+
+loadPanReferenceDictionary();

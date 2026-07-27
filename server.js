@@ -12,6 +12,7 @@ const types = {
   ".css": "text/css; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
+  ".csv": "text/csv; charset=utf-8",
   ".svg": "image/svg+xml",
   ".png": "image/png"
 };
@@ -43,6 +44,10 @@ createServer(async (req, res) => {
   try {
     if (req.method === "POST" && url.pathname === "/api/analyze") {
       const input = await readJsonBody(req);
+      if (input.referenceCohort === "PAN") {
+        const panDictionary = await readFile(join(root, "reference-data", "PAN_Data_Dictionary.csv"), "utf8");
+        input.candidateDatasets = `### Precision Aging Network (PAN)\n${panDictionary}`;
+      }
       const result = await runModelAssessment(input);
       sendJson(res, 200, result);
       return;

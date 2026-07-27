@@ -85,10 +85,13 @@ h1 {
 }
 
 .mode-tab {
+  display: flex;
+  align-items: center;
   text-align: left;
   background: rgba(255, 255, 255, 0.08);
   color: #ecf6f3;
   padding: 0 14px;
+  text-decoration: none;
 }
 
 .mode-tab.active {
@@ -202,6 +205,31 @@ textarea {
   color: #617077;
   font-size: 0.82rem;
   font-weight: 650;
+}
+
+.reference-cohort {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #b9d3cf;
+  border-left: 4px solid #00747c;
+  border-radius: 8px;
+  background: #f1f8f6;
+}
+
+.reference-cohort .eyebrow {
+  margin-bottom: 5px;
+}
+
+.reference-cohort h3,
+.reference-cohort p {
+  margin: 0;
+}
+
+.reference-cohort p:not(.eyebrow) {
+  margin-top: 6px;
+  color: #526168;
+  line-height: 1.45;
 }
 
 textarea {
