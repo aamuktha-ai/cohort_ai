@@ -8,6 +8,8 @@ For now, this is a local browser app with an optional LLM backend. If no model i
 
 - Lets you upload or paste an investigator/local data dictionary.
 - Lets you upload or paste one or more public cohort data dictionaries.
+- Reconstructs variable records from common `page,text` CSV exports of PDF data dictionaries, while flagging them for source review.
+- Reads standard CSV/TSV dictionaries, JSON Schema property lists, YAML schema property lists, and cBioPortal's five-row clinical-data metadata format.
 - Lets you list the variables you care about comparing.
 - Generates a variable crosswalk and feasibility report that looks at:
   - variable name overlap
@@ -69,9 +71,12 @@ The project now includes a deterministic validation package in `validation/`.
 npm run validate
 npm run benchmark
 npm run adjudication
+npm run public-smoke
 ```
 
 `npm run validate` runs the engineering regression fixtures for all CohortAI match types. `npm run benchmark` produces a structured metric report from those fixtures. `npm run adjudication` calculates Cohen's kappa from two independent expert label sets. These commands make implementation changes auditable, but they are not a substitute for the expert-adjudicated benchmark required by the UACC/PAN validation protocol. See `validation/README.md` for the formal study workflow and the required thresholds.
+
+`npm run public-smoke` downloads the current public NCI GDC diagnosis schema and verifies CohortAI can read its YAML properties without saving the schema in this repository. It needs an internet connection and checks parser behavior, not clinical validity.
 
 ## Sharing It
 
@@ -131,7 +136,7 @@ This is still an early version. The app is mainly meant to show the workflow:
 
 ## Next Things To Add
 
-- Better CSV/TSV parsing instead of just reading uploaded files as text.
+- Direct PDF upload and table extraction for native PDF files.
 - Better variable extraction and matching for arbitrary dictionary formats.
 - Test the live Claude/Llama output against expert-adjudicated labels.
 - Saved projects or previous runs.

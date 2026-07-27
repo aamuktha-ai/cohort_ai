@@ -43,17 +43,28 @@ function formatUploadedDictionary(fileName, content) {
   return `### ${fileName}\n${content.trim()}`;
 }
 
+function isPdfTextExport(content) {
+  const firstLine = String(content || "").split(/\r?\n/, 1)[0].replace(/^\uFEFF/, "").trim().toLowerCase();
+  return firstLine === "page,text" || firstLine === '"page","text"';
+}
+
 async function readUploadedFile(file) {
   const content = await file.text();
-  return formatUploadedDictionary(file.name, content);
+  return {
+    formatted: formatUploadedDictionary(file.name, content),
+    isPdfTextExport: isPdfTextExport(content)
+  };
 }
 
 async function handleLocalUpload() {
   const [file] = localDictionaryFile.files;
   if (!file) return;
 
-  fields.localDataset.value = await readUploadedFile(file);
-  localFileStatus.textContent = `Uploaded ${file.name}`;
+  const uploaded = await readUploadedFile(file);
+  fields.localDataset.value = uploaded.formatted;
+  localFileStatus.textContent = uploaded.isPdfTextExport
+    ? `Uploaded ${file.name} - PDF-text CSV detected`
+    : `Uploaded ${file.name}`;
 }
 
 async function handleCandidateUpload() {
@@ -61,8 +72,11 @@ async function handleCandidateUpload() {
   if (!files.length) return;
 
   const dictionaries = await Promise.all(files.map(readUploadedFile));
-  fields.candidateDatasets.value = dictionaries.join("\n\n");
-  candidateFileStatus.textContent = `Uploaded ${files.length} file${files.length === 1 ? "" : "s"}`;
+  fields.candidateDatasets.value = dictionaries.map((item) => item.formatted).join("\n\n");
+  const pdfTextCount = dictionaries.filter((item) => item.isPdfTextExport).length;
+  candidateFileStatus.textContent = pdfTextCount
+    ? `Uploaded ${files.length} file${files.length === 1 ? "" : "s"} - ${pdfTextCount} PDF-text CSV detected`
+    : `Uploaded ${files.length} file${files.length === 1 ? "" : "s"}`;
 }
 
 function loadSample() {
@@ -223,6 +237,11 @@ function renderReport(data) {
     <article class="report-card">
       <h3>Sample-Overlap Risk</h3>
       <p><strong>${escapeHtml(data.sampleOverlapRisk?.level || "Not assessed")}</strong> - ${escapeHtml(data.sampleOverlapRisk?.rationale || "No structured overlap assessment was returned.")}</p>
+    </article>
+
+    <article class="report-card">
+      <h3>Dictionary Parsing</h3>
+      <ul>${(data.provenance.dictionaryParsing || []).map((item) => `<li><strong>${escapeHtml(item.cohort)}</strong>: ${escapeHtml(item.recordCount)} records using ${escapeHtml(item.format)}.${item.needsExtractionReview ? " Review source evidence before final sign-off." : ""}</li>`).join("")}</ul>
     </article>
 
     <article class="report-card">

@@ -9,6 +9,7 @@
     "test": "node --test",
     "validate": "node --test test/analysisEngine.test.js",
     "benchmark": "node validation/score-benchmark.js validation/fixtures/development-cases.json",
-    "adjudication": "node validation/check-adjudication.js validation/templates/adjudication-case-template.json"
+    "adjudication": "node validation/check-adjudication.js validation/templates/adjudication-case-template.json",
+    "public-smoke": "node validation/public-smoke-test.js"
   }
 }

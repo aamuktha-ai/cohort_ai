@@ -1,4 +1,4 @@
-export const pipelineVersion = "cohortai-prototype-0.4";
+export const pipelineVersion = "cohortai-prototype-0.6";
 
 const matchDefinitions = {
   Direct: {
@@ -38,11 +38,11 @@ const dimensions = [
 ];
 
 const constructAliases = {
-  age: ["age", "age_years", "age_at_diagnosis", "age_at_tx", "age at", "naccage"],
-  sex: ["sex", "gender", "biological sex", "ptgender"],
-  education: ["education", "educ", "pteducat", "edu_yrs", "years of education"],
+  age: ["age", "age_years", "age_at_diagnosis", "age_at_tx", "age at", "naccage", "age_hml"],
+  sex: ["sex", "gender", "biological sex", "ptgender", "sex_hml"],
+  education: ["education", "educ", "pteducat", "edu_yrs", "edu_yrs_hml", "years of education"],
   bmi: ["bmi", "body mass index", "height", "weight"],
-  race: ["race", "ethnicity", "hispanic", "ptraccat", "ptethcat"],
+  race: ["race", "ethnicity", "naccnihr", "ptraccat", "ptethcat", "race_hml_1"],
   apoe: ["apoe", "apoe4", "ε4", "e4", "apgen"],
   stage: ["stage", "ajcc", "pathologic_stage", "stage_at_tx"],
   treatment: ["treatment", "therapy", "line_of_therapy", "prior_treatment"],
@@ -50,13 +50,14 @@ const constructAliases = {
   "progression-free survival": ["pfs", "progression-free", "progression free"],
   "overall survival": ["os", "overall survival", "death", "last contact"],
   "immune signature": ["signature", "expression", "immune", "rna"],
-  moca: ["moca", "montreal cognitive assessment"],
+  moca: ["moca", "naccmoca", "moca_total", "montreal cognitive assessment"],
   mmse: ["mmse", "mmscore", "mini mental"],
   depression: ["depression", "gds", "phq", "phq-9", "depressed"],
   hypertension: ["hypertension", "hypertens"],
   diabetes: ["diabetes", "diab"],
   smoking: ["smoking", "smoke", "tobacco"],
-  alcohol: ["alcohol", "drinks", "substance"]
+  alcohol: ["alcohol", "drinks", "substance"],
+  "trail making test a": ["traila", "trails a", "trail making test part a"]
 };
 
 const unitTerms = ["years", "year", "months", "month", "days", "day", "weeks", "week", "pg/ml", "lbs", "inches", "score", "z-score"];
@@ -115,6 +116,21 @@ function tokenSimilarity(a, b) {
   return overlap / new Set([...aTokens, ...bTokens]).size;
 }
 
+function variableAliasScore(variable, aliases) {
+  const normalizedVariable = normalize(variable);
+  if (!normalizedVariable) return 0;
+
+  return Math.max(...aliases.map((alias) => {
+    const normalizedAlias = normalize(alias);
+    if (!normalizedAlias) return 0;
+    const specificityBonus = Math.min(normalizedAlias.length / 100, 0.09);
+    if (normalizedVariable === normalizedAlias) return 0.9 + specificityBonus;
+    if (normalizedVariable.startsWith(`${normalizedAlias} `)) return 0.82 + specificityBonus;
+    if (normalizedVariable.endsWith(` ${normalizedAlias}`)) return 0.78 + specificityBonus;
+    return 0;
+  }));
+}
+
 function getAliases(variable) {
   const normalized = normalize(variable);
   const matchingKey = Object.keys(constructAliases).find((key) => {
@@ -153,11 +169,248 @@ function parseDelimitedLine(line, delimiter) {
   return values;
 }
 
+function rawLines(value) {
+  return String(value || "").replace(/^\uFEFF/, "").split(/\r?\n/);
+}
+
 function bestColumnIndex(headers, candidates) {
   return headers.findIndex((header) => candidates.some((candidate) => normalize(header).includes(candidate)));
 }
 
+function isPdfTextExport(headers) {
+  return headers.length === 2 && normalize(headers[0]) === "page" && normalize(headers[1]) === "text";
+}
+
+function isCbioPortalClinicalFormat(lines) {
+  if (lines.length < 5) return false;
+  return lines.slice(0, 4).every((line) => line.trim().startsWith("#")) && !lines[4].trim().startsWith("#");
+}
+
+function parseCbioPortalClinicalDictionary(text, cohortLabel) {
+  const lines = rawLines(text).filter(Boolean);
+  if (!isCbioPortalClinicalFormat(lines)) return [];
+
+  const delimiter = detectDelimiter(lines[0]);
+  if (!delimiter) return [];
+
+  const labels = parseDelimitedLine(lines[0].replace(/^\s*#/, ""), delimiter);
+  const descriptions = parseDelimitedLine(lines[1].replace(/^\s*#/, ""), delimiter);
+  const dataTypes = parseDelimitedLine(lines[2].replace(/^\s*#/, ""), delimiter);
+  const priorities = parseDelimitedLine(lines[3].replace(/^\s*#/, ""), delimiter);
+  const variables = parseDelimitedLine(lines[4], delimiter);
+  const identifiers = new Set(["PATIENT_ID", "SAMPLE_ID"]);
+
+  return variables.map((variable, index) => {
+    const name = String(variable || "").trim();
+    if (!name || identifiers.has(name.toUpperCase())) return null;
+    return makeVariableRecord({
+      cohortLabel,
+      sourceLine: lines.slice(0, 5).map((line) => line.trim()).join(" | "),
+      rowIndex: 5,
+      variable: name,
+      description: descriptions[index] || labels[index] || "",
+      values: [dataTypes[index], priorities[index]].filter(Boolean).join("; "),
+      domain: "cBioPortal clinical data"
+    });
+  }).filter(Boolean);
+}
+
+function parseYamlSchemaDictionary(text, cohortLabel) {
+  const lines = rawLines(text);
+  const propertiesIndex = lines.findIndex((line) => /^\s*properties:\s*(?:#.*)?$/.test(line));
+  if (propertiesIndex === -1) return [];
+
+  const propertiesIndent = (lines[propertiesIndex].match(/^\s*/) || [""])[0].length;
+  const records = [];
+  let current = null;
+
+  const saveCurrent = () => {
+    if (!current) return;
+    const descriptionLine = current.lines.find((line) => /^\s*(description|title):\s*/i.test(line));
+    const referenceLine = current.lines.find((line) => /^\s*\$ref:\s*/.test(line));
+    const enumValues = current.lines
+      .filter((line) => /^\s*-\s+/.test(line))
+      .map((line) => line.replace(/^\s*-\s+/, "").replace(/["']/g, "").trim());
+    const description = descriptionLine
+      ? descriptionLine.replace(/^\s*(description|title):\s*/i, "").replace(/^['"]|['"]$/g, "").trim()
+      : referenceLine
+        ? `Schema reference ${referenceLine.replace(/^\s*\$ref:\s*/, "").trim()}`
+        : `Schema field ${current.variable}`;
+
+    records.push(makeVariableRecord({
+      cohortLabel,
+      sourceLine: current.lines.join(" ").trim(),
+      rowIndex: current.rowIndex,
+      variable: current.variable,
+      description,
+      values: enumValues.join("; "),
+      domain: "YAML schema"
+    }));
+    current = null;
+  };
+
+  for (let index = propertiesIndex + 1; index < lines.length; index += 1) {
+    const line = lines[index];
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) {
+      if (current) current.lines.push(line);
+      continue;
+    }
+
+    const indent = (line.match(/^\s*/) || [""])[0].length;
+    if (indent <= propertiesIndent) break;
+    const propertyMatch = line.match(new RegExp(`^\\s{${propertiesIndent + 2}}([A-Za-z][A-Za-z0-9_-]*):\\s*(?:#.*)?$`));
+    if (propertyMatch) {
+      saveCurrent();
+      current = { variable: propertyMatch[1], rowIndex: index + 1, lines: [line] };
+    } else if (current) {
+      current.lines.push(line);
+    }
+  }
+  saveCurrent();
+  return records;
+}
+
+function extractPdfTextRows(lines) {
+  return lines.slice(1).map((line, index) => {
+    const cells = parseDelimitedLine(line, ",");
+    return {
+      page: cells[0] || "",
+      text: cells.slice(1).join(",").trim(),
+      rowIndex: index + 2,
+      sourceLine: line
+    };
+  }).filter((row) => row.text);
+}
+
+function isUppercaseVariable(value) {
+  return /^[A-Z][A-Z0-9_]{2,}$/.test(value) && !["DATA", "SOURCE", "DESCRIPTION", "VARIABLE", "ALLOWABLE", "CODES", "UNITS"].includes(value);
+}
+
+function isLowercaseVariable(value) {
+  return /^[a-z][a-z0-9_]{2,}$/.test(value) && !["description", "derivation", "allowable", "codes", "unit", "units", "source", "variable", "values"].includes(value);
+}
+
+function cleanPdfDescription(value) {
+  return String(value || "")
+    .replace(/\s+(Original UDS question|NACC derived variable|Uniform Data Set).*$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function parsePdfTextExportDictionary(lines, cohortLabel) {
+  const rows = extractPdfTextRows(lines);
+  const extracted = [];
+  let activeUppercaseVariable = "";
+  let activeLowercaseRecord = null;
+
+  const saveLowercaseRecord = () => {
+    if (!activeLowercaseRecord?.description) return;
+    extracted.push(activeLowercaseRecord);
+    activeLowercaseRecord = null;
+  };
+
+  rows.forEach((row) => {
+    const text = row.text;
+    const words = text.split(/\s+/);
+    const indexVariableAt = words.findIndex((word, index) => index > 0 && isUppercaseVariable(word));
+
+    if (indexVariableAt !== -1) {
+      const variable = words[indexVariableAt];
+      const description = cleanPdfDescription(words.slice(indexVariableAt + 1).join(" "));
+      if (description.length >= 8 && /[a-z]/.test(description)) {
+        extracted.push({
+          variable,
+          description,
+          sourceLine: row.sourceLine,
+          rowIndex: row.rowIndex
+        });
+      }
+    }
+
+    if (isUppercaseVariable(text)) {
+      activeUppercaseVariable = text;
+      return;
+    }
+
+    if (activeUppercaseVariable && /^Short descriptor\s+/i.test(text)) {
+      extracted.push({
+        variable: activeUppercaseVariable,
+        description: cleanPdfDescription(text.replace(/^Short descriptor\s+/i, "")),
+        sourceLine: row.sourceLine,
+        rowIndex: row.rowIndex
+      });
+      return;
+    }
+
+    if (activeUppercaseVariable && /^Allowable codes\s+/i.test(text)) {
+      extracted.push({
+        variable: activeUppercaseVariable,
+        description: "",
+        values: text.replace(/^Allowable codes\s+/i, "").trim(),
+        sourceLine: row.sourceLine,
+        rowIndex: row.rowIndex
+      });
+      return;
+    }
+
+    if (isLowercaseVariable(text)) {
+      saveLowercaseRecord();
+      activeLowercaseRecord = {
+        variable: text,
+        description: "",
+        values: "",
+        units: "",
+        sourceLine: row.sourceLine,
+        rowIndex: row.rowIndex
+      };
+      return;
+    }
+
+    if (!activeLowercaseRecord) return;
+    if (/^Description:\s*/i.test(text)) {
+      activeLowercaseRecord.description = cleanPdfDescription(text.replace(/^Description:\s*/i, ""));
+    } else if (/^(Field Options|Allowable codes):\s*/i.test(text)) {
+      activeLowercaseRecord.values = text.replace(/^(Field Options|Allowable codes):\s*/i, "").trim();
+    } else if (/^Unit:\s*/i.test(text)) {
+      activeLowercaseRecord.units = text.replace(/^Unit:\s*/i, "").trim();
+    }
+  });
+  saveLowercaseRecord();
+
+  const merged = new Map();
+  extracted.forEach((item) => {
+    const key = normalize(item.variable);
+    if (!key) return;
+    const existing = merged.get(key) || {
+      cohortLabel,
+      variable: item.variable,
+      description: "",
+      values: "",
+      units: "",
+      sourceLine: item.sourceLine,
+      rowIndex: item.rowIndex
+    };
+
+    if (item.description && item.description.length > existing.description.length) {
+      existing.description = item.description;
+      existing.sourceLine = item.sourceLine;
+      existing.rowIndex = item.rowIndex;
+    }
+    if (item.values && item.values.length > existing.values.length) existing.values = item.values;
+    if (item.units && item.units.length > existing.units.length) existing.units = item.units;
+    merged.set(key, existing);
+  });
+
+  return [...merged.values()]
+    .filter((item) => item.description || item.values || item.units)
+    .map((item) => makeVariableRecord(item));
+}
+
 function parseStructuredDictionary(text, cohortLabel) {
+  const cbioPortalRows = parseCbioPortalClinicalDictionary(text, cohortLabel);
+  if (cbioPortalRows.length) return cbioPortalRows;
+
   const lines = splitLines(text).filter((line) => !line.startsWith("###"));
   if (!lines.length) return [];
 
@@ -166,6 +419,7 @@ function parseStructuredDictionary(text, cohortLabel) {
 
   const headers = parseDelimitedLine(lines[0], delimiter);
   if (headers.length < 2) return parseFreeTextDictionary(text, cohortLabel);
+  if (delimiter === "," && isPdfTextExport(headers)) return parsePdfTextExportDictionary(lines, cohortLabel);
 
   const variableIndex = bestColumnIndex(headers, ["variable", "field", "name", "column"]);
   const descriptionIndex = bestColumnIndex(headers, ["description", "definition", "label", "construct", "instrument"]);
@@ -229,7 +483,19 @@ function parseFreeTextDictionary(text, cohortLabel) {
 function parseJsonDictionary(text, cohortLabel) {
   try {
     const parsed = JSON.parse(text);
-    const rows = Array.isArray(parsed) ? parsed : Object.entries(parsed).map(([variable, value]) => ({ variable, ...value }));
+    const rows = Array.isArray(parsed)
+      ? parsed
+      : parsed?.properties && typeof parsed.properties === "object"
+        ? Object.entries(parsed.properties).map(([variable, definition]) => ({
+          variable,
+          ...(definition && typeof definition === "object" ? definition : {}),
+          values: Array.isArray(definition?.enum) ? definition.enum.join("; ") : definition?.values,
+          domain: parsed.title || "JSON Schema"
+        }))
+        : Object.entries(parsed || {}).map(([variable, value]) => ({
+          variable,
+          ...(value && typeof value === "object" ? value : { description: String(value || "") })
+        }));
 
     return rows.map((row, index) => makeVariableRecord({
       cohortLabel,
@@ -297,28 +563,63 @@ function parseDictionary(text, cohortLabel) {
   const jsonRows = parseJsonDictionary(trimmed, cohortLabel);
   if (jsonRows.length) return jsonRows;
 
+  const yamlRows = parseYamlSchemaDictionary(trimmed, cohortLabel);
+  if (yamlRows.length) return yamlRows;
+
   return parseStructuredDictionary(trimmed, cohortLabel);
 }
 
+function describeDictionaryParsing(text, cohortLabel) {
+  const lines = splitLines(text).filter((line) => !line.startsWith("###"));
+  const delimiter = lines[0] ? detectDelimiter(lines[0]) : null;
+  const headers = delimiter ? parseDelimitedLine(lines[0], delimiter) : [];
+  const pdfTextExport = delimiter === "," && isPdfTextExport(headers);
+  const cbioPortalClinical = isCbioPortalClinicalFormat(rawLines(text).filter(Boolean));
+  const yamlSchema = !cbioPortalClinical && !pdfTextExport && parseYamlSchemaDictionary(text, cohortLabel).length > 0;
+  const records = parseDictionary(text, cohortLabel);
+
+  return {
+    cohort: cohortLabel,
+    format: pdfTextExport
+      ? "PDF-text CSV reconstruction"
+      : cbioPortalClinical
+        ? "cBioPortal clinical data format"
+        : yamlSchema
+          ? "YAML schema"
+          : "Structured or free-text dictionary",
+    parser: pdfTextExport
+      ? "Variable index and field-description reconstruction"
+      : cbioPortalClinical
+        ? "Five-row clinical metadata parser"
+        : yamlSchema
+          ? "Schema properties parser"
+          : "Header-based dictionary parser",
+    recordCount: records.length,
+    needsExtractionReview: pdfTextExport || yamlSchema
+  };
+}
+
 function parseCandidateDictionaries(text) {
-  const lines = splitLines(text);
+  const lines = rawLines(text);
   const blocks = [];
   let label = "Candidate cohort";
   let content = [];
 
   const saveBlock = () => {
-    if (content.length) {
+    if (content.some((line) => line.trim())) {
+      const sourceText = content.join("\n");
       blocks.push({
         label,
-        records: parseDictionary(content.join("\n"), label)
+        sourceText,
+        records: parseDictionary(sourceText, label)
       });
     }
   };
 
   lines.forEach((line) => {
-    if (line.startsWith("###")) {
+    if (line.trim().startsWith("###")) {
       saveBlock();
-      label = line.replace(/^###\s*/, "").trim() || "Candidate cohort";
+      label = line.trim().replace(/^###\s*/, "").trim() || "Candidate cohort";
       content = [];
       return;
     }
@@ -326,7 +627,11 @@ function parseCandidateDictionaries(text) {
   });
   saveBlock();
 
-  return blocks.length ? blocks : [{ label: "Candidate cohort", records: parseDictionary(text, "Candidate cohort") }];
+  return blocks.length ? blocks : [{
+    label: "Candidate cohort",
+    sourceText: text,
+    records: parseDictionary(text, "Candidate cohort")
+  }];
 }
 
 function scoreRecordAgainstTarget(record, target) {
@@ -334,10 +639,13 @@ function scoreRecordAgainstTarget(record, target) {
   const aliasMatch = containsAny(record.normalized, aliases);
   const variableScore = Math.max(...aliases.map((alias) => tokenSimilarity(record.variable, alias)));
   const descriptionScore = Math.max(...aliases.map((alias) => tokenSimilarity(record.description, alias)));
-  const constructScore = Math.max(variableScore, descriptionScore, aliasMatch ? 0.82 : 0);
+  const canonicalVariableScore = variableAliasScore(record.variable, aliases);
+  const nameEvidence = canonicalVariableScore || variableScore;
+  const constructScore = Math.max(nameEvidence, descriptionScore, aliasMatch ? 0.68 : 0);
   const evidenceBonus = (record.hasUnit ? 0.04 : 0) + (record.hasCoding ? 0.04 : 0) + (record.hasInstrument ? 0.03 : 0);
 
-  return clamp(constructScore + evidenceBonus, 0, 1);
+  // Preserve the ranking advantage of a canonical field name even when both records have rich metadata.
+  return clamp(constructScore + evidenceBonus * (1 - constructScore), 0, 1);
 }
 
 function findBestRecord(records, target) {
@@ -346,18 +654,23 @@ function findBestRecord(records, target) {
     .sort((a, b) => b.score - a.score);
   const best = ranked[0];
 
-  if (!best || best.score < 0.18) {
+  if (!best || best.score < 0.3) {
     return {
       found: false,
       score: 0,
-      record: null
+      record: null,
+      ambiguous: false
     };
   }
+
+  const second = ranked[1];
+  const ambiguityMargin = second ? best.score - second.score : 1;
 
   return {
     found: true,
     score: best.score,
-    record: best.record
+    record: best.record,
+    ambiguous: best.score < 0.56 && ambiguityMargin < 0.08
   };
 }
 
@@ -392,6 +705,13 @@ function compareRecords(localMatch, publicMatch, targetIsExplicit) {
 
   const local = localMatch.record;
   const candidate = publicMatch.record;
+  if (localMatch.ambiguous || publicMatch.ambiguous) {
+    return {
+      matchType: "Needs review",
+      confidence: 48,
+      rationale: "More than one dictionary field was similarly plausible for this target construct; human adjudication is needed before harmonization."
+    };
+  }
   const nameSimilarity = tokenSimilarity(local.variable, candidate.variable);
   const descriptionSimilarity = tokenSimilarity(local.description, candidate.description);
   const valueSimilarity = tokenSimilarity(local.values, candidate.values);
@@ -622,7 +942,15 @@ function buildNextSteps(crosswalk) {
   ];
 }
 
-function buildProvenance(input) {
+function buildDictionaryParsingInfo(input) {
+  const candidates = parseCandidateDictionaries(input.candidateDatasets);
+  return [
+    describeDictionaryParsing(input.localDataset, "Investigator"),
+    ...candidates.map((candidate) => describeDictionaryParsing(candidate.sourceText, candidate.label))
+  ];
+}
+
+function buildProvenance(input, dictionaryParsing) {
   return {
     pipelineVersion,
     generatedAt: new Date().toISOString(),
@@ -632,6 +960,7 @@ function buildProvenance(input) {
     inputFingerprint: createInputFingerprint(input),
     dictionaryScope: "metadata/data dictionaries only; no subject-level data",
     userAttestation: Boolean(input.userAttestation),
+    dictionaryParsing,
     matchTaxonomy: matchDefinitions
   };
 }
@@ -671,6 +1000,10 @@ export function analyzeFeasibility(input) {
   const crosswalk = buildCrosswalk(input);
   const reportDimensions = buildDimensions(crosswalk);
   const feasibilityScore = scoreFeasibility(reportDimensions, crosswalk);
+  const dictionaryParsing = buildDictionaryParsingInfo(input);
+  const parsingFlags = dictionaryParsing
+    .filter((item) => item.needsExtractionReview)
+    .map((item) => `${item.cohort}: ${item.recordCount} variable records were reconstructed from a PDF-text CSV. Review the source evidence lines before treating matches as final.`);
 
   return {
     mode: "cohort",
@@ -683,9 +1016,9 @@ export function analyzeFeasibility(input) {
     matchSummary: buildMatchSummary(crosswalk),
     crosswalk,
     sampleOverlapRisk: inferSampleOverlapRisk(normalize(`${input.localDataset}\\n${input.candidateDatasets}`)),
-    flags: buildFlags(crosswalk, input),
+    flags: unique([...buildFlags(crosswalk, input), ...parsingFlags]),
     nextSteps: buildNextSteps(crosswalk),
-    provenance: buildProvenance(input),
+    provenance: buildProvenance(input, dictionaryParsing),
     disclaimer: "Decision support only. This report does not replace expert biostatistical review and does not grant or substitute for data access approval.",
     llmStatus: "Prototype professor-aligned rule engine. Connect the validated LLM adapter before production use."
   };

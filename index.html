@@ -61,14 +61,14 @@
 
           <label>
             Investigator data dictionary
-            <input id="localDictionaryFile" class="file-input" type="file" accept=".txt,.csv,.tsv,.json,.md" />
+            <input id="localDictionaryFile" class="file-input" type="file" accept=".txt,.csv,.tsv,.json,.yaml,.yml,.md" />
             <span class="file-status" id="localFileStatus">No file uploaded</span>
             <textarea id="localDataset" rows="7" placeholder="Paste variable names and descriptions from the local cohort data dictionary. Example: response_recist = best overall response by RECIST 1.1; pfs_months = months from treatment start to progression or death."></textarea>
           </label>
 
           <label>
             Candidate public cohort data dictionaries
-            <input id="candidateDictionaryFiles" class="file-input" type="file" accept=".txt,.csv,.tsv,.json,.md" multiple />
+            <input id="candidateDictionaryFiles" class="file-input" type="file" accept=".txt,.csv,.tsv,.json,.yaml,.yml,.md" multiple />
             <span class="file-status" id="candidateFileStatus">No files uploaded</span>
             <textarea id="candidateDatasets" rows="8" placeholder="Paste one public cohort data dictionary per block or line. Include variable name, description, allowed values, units, missingness notes, endpoint definitions, and accession if known."></textarea>
           </label>
