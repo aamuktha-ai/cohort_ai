@@ -24,8 +24,11 @@ const panReferenceMode = document.body.dataset.referenceCohort === "PAN";
 const usePanReferenceLlm = document.body.dataset.usePanLlm === "true";
 
 const form = document.querySelector("#analysisForm");
+const generateButton = document.querySelector("#generateButton") || form.querySelector("button[type='submit']");
 const report = document.querySelector("#report");
 const emptyState = document.querySelector("#emptyState");
+const formError = document.querySelector("#formError");
+const analysisProgress = document.querySelector("#analysisProgress");
 const downloadButton = document.querySelector("#downloadButton");
 const downloadCrosswalkButton = document.querySelector("#downloadCrosswalkButton");
 const localDictionaryFile = document.querySelector("#localDictionaryFile");
@@ -42,6 +45,24 @@ const fields = {
   variables: document.querySelector("#variables"),
   userAttestation: document.querySelector("#userAttestation")
 };
+
+function showError(message) {
+  if (!formError) return;
+  formError.textContent = message;
+  formError.classList.remove("hidden");
+}
+
+function clearError() {
+  if (!formError) return;
+  formError.textContent = "";
+  formError.classList.add("hidden");
+}
+
+function setAnalysisProgress(message = "") {
+  if (!analysisProgress) return;
+  analysisProgress.textContent = message;
+  analysisProgress.classList.toggle("hidden", !message);
+}
 
 function escapeHtml(value) {
   return String(value)
@@ -62,35 +83,111 @@ function isPdfTextExport(content) {
 }
 
 async function readUploadedFile(file) {
-  const content = await file.text();
+  const content = await readDictionaryFile(file);
   return {
     formatted: formatUploadedDictionary(file.name, content),
-    isPdfTextExport: isPdfTextExport(content)
+    isPdfTextExport: isPdfTextExport(content),
+    isPdf: isPdfFile(file),
+    characterCount: content.length
   };
+}
+
+function isPdfFile(file) {
+  return file.type === "application/pdf" || /\.pdf$/i.test(file.name || "");
+}
+
+function pdfPageText(items) {
+  const lines = new Map();
+  items.forEach((item) => {
+    const text = String(item.str || "").trim();
+    if (!text) return;
+    const transform = Array.isArray(item.transform) ? item.transform : [];
+    const y = Math.round(Number(transform[5]) || 0);
+    const x = Number(transform[4]) || 0;
+    const line = lines.get(y) || [];
+    line.push({ text, x });
+    lines.set(y, line);
+  });
+
+  return [...lines.entries()]
+    .sort(([a], [b]) => b - a)
+    .map(([, line]) => line.sort((a, b) => a.x - b.x).map((item) => item.text).join(" "))
+    .join("\n");
+}
+
+async function extractPdfDictionaryText(file) {
+  const pdfjs = await import(new URL("../vendor/pdfjs/pdf.min.mjs", import.meta.url));
+  pdfjs.GlobalWorkerOptions.workerSrc = new URL("../vendor/pdfjs/pdf.worker.min.mjs", import.meta.url).toString();
+  const task = pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) });
+  task.onProgress = ({ loaded = 0, total = 0 }) => {
+    if (total) setAnalysisProgress("Reading " + file.name + ": " + Math.round((loaded / total) * 100) + "%");
+  };
+
+  const pdf = await task.promise;
+  const pages = [];
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+    setAnalysisProgress("Extracting page " + pageNumber + " of " + pdf.numPages + " from " + file.name + "...");
+    const page = await pdf.getPage(pageNumber);
+    const content = await page.getTextContent();
+    const text = pdfPageText(content.items);
+    if (text) pages.push("Page " + pageNumber + "\n" + text);
+  }
+  await task.destroy();
+
+  const extracted = pages.join("\n\n");
+  if (extracted.replace(/\s/g, "").length < 100) {
+    throw new Error("This PDF does not contain enough selectable text to read as a dictionary. Upload an OCRed/text-based PDF or a CSV/TSV export.");
+  }
+  return extracted;
+}
+
+async function readDictionaryFile(file) {
+  return isPdfFile(file) ? extractPdfDictionaryText(file) : file.text();
 }
 
 async function handleLocalUpload() {
   const [file] = localDictionaryFile.files;
   if (!file) return;
-
-  const uploaded = await readUploadedFile(file);
-  fields.localDataset.value = uploaded.formatted;
-  localFileStatus.textContent = uploaded.isPdfTextExport
-    ? `Uploaded ${file.name} - PDF-text CSV detected`
-    : `Uploaded ${file.name}`;
+  try {
+    clearError();
+    setAnalysisProgress("Reading " + file.name + "...");
+    const uploaded = await readUploadedFile(file);
+    if (!uploaded.formatted.trim() || uploaded.formatted.includes("\u0000")) {
+      throw new Error("This file could not be read as a data dictionary.");
+    }
+    fields.localDataset.value = uploaded.formatted;
+    localFileStatus.textContent = (uploaded.isPdf ? "Extracted " : "Uploaded ") + file.name + " (" + uploaded.characterCount.toLocaleString() + " characters)";
+    setAnalysisProgress();
+  } catch (error) {
+    localDictionaryFile.value = "";
+    localFileStatus.textContent = "No file uploaded";
+    setAnalysisProgress();
+    showError(error.message || "The selected investigator dictionary could not be read.");
+  }
 }
 
 async function handleCandidateUpload() {
   if (panReferenceMode) return;
   const files = Array.from(candidateDictionaryFiles.files);
   if (!files.length) return;
-
-  const dictionaries = await Promise.all(files.map(readUploadedFile));
-  fields.candidateDatasets.value = dictionaries.map((item) => item.formatted).join("\n\n");
-  const pdfTextCount = dictionaries.filter((item) => item.isPdfTextExport).length;
-  candidateFileStatus.textContent = pdfTextCount
-    ? `Uploaded ${files.length} file${files.length === 1 ? "" : "s"} - ${pdfTextCount} PDF-text CSV detected`
-    : `Uploaded ${files.length} file${files.length === 1 ? "" : "s"}`;
+  try {
+    clearError();
+    setAnalysisProgress("Reading " + files.length + " candidate dictionar" + (files.length === 1 ? "y" : "ies") + "...");
+    const dictionaries = [];
+    for (const file of files) {
+      setAnalysisProgress("Reading " + file.name + "...");
+      dictionaries.push(await readUploadedFile(file));
+    }
+    fields.candidateDatasets.value = dictionaries.map((item) => item.formatted).join("\n\n");
+    const pdfCount = dictionaries.filter((item) => item.isPdf).length;
+    candidateFileStatus.textContent = "Loaded " + files.length + " candidate dictionar" + (files.length === 1 ? "y" : "ies") + (pdfCount ? " (" + pdfCount + " PDF" + (pdfCount === 1 ? "" : "s") + " extracted)" : "");
+    setAnalysisProgress();
+  } catch (error) {
+    candidateDictionaryFiles.value = "";
+    candidateFileStatus.textContent = "No files uploaded";
+    setAnalysisProgress();
+    showError(error.message || "One or more candidate dictionaries could not be read.");
+  }
 }
 
 async function loadPanReferenceDictionary() {
@@ -119,6 +216,8 @@ function loadSample() {
   localFileStatus.textContent = "Sample dictionary loaded";
   if (candidateFileStatus) candidateFileStatus.textContent = "Sample dictionaries loaded";
   fields.userAttestation.checked = true;
+  setAnalysisProgress();
+  clearError();
 }
 
 function collectInput() {
@@ -226,6 +325,7 @@ function renderReport(data) {
           </div>
         `).join("")}
       </div>
+      <p>${escapeHtml(data.disclaimer || "Decision support only. Confirm final decisions against the source documentation.")}</p>
     </article>
 
     <article class="report-card">
@@ -255,7 +355,12 @@ function renderReport(data) {
                 <td>${escapeHtml(row.harmonizationAction)}</td>
               </tr>
               <tr class="rationale-row">
-                <td colspan="7">${escapeHtml(row.rationale)}</td>
+                <td colspan="7">
+                  <strong>Why:</strong> ${escapeHtml(row.rationale)}<br>
+                  <strong>Investigator definition:</strong> ${escapeHtml(row.localDescription)}<br>
+                  <strong>Candidate definition:</strong> ${escapeHtml(row.publicDescription)}<br>
+                  <strong>Evidence:</strong> ${escapeHtml(row.localEvidenceLine || "Investigator dictionary row")} | ${escapeHtml(row.publicEvidenceLine || "Candidate dictionary row")}
+                </td>
               </tr>
             `).join("")}
           </tbody>
@@ -299,7 +404,7 @@ function renderReport(data) {
 }
 
 async function requestLlmReport(input) {
-  const response = await fetch("api/analyze", {
+  const response = await fetch("/api/analyze", {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
@@ -307,11 +412,15 @@ async function requestLlmReport(input) {
     body: JSON.stringify(input)
   });
 
-  if (!response.ok) {
-    throw new Error("Live model is not configured or did not return a report.");
+  const text = await response.text();
+  let payload;
+  try {
+    payload = text ? JSON.parse(text) : {};
+  } catch {
+    throw new Error("The CohortAI API did not return a valid report.");
   }
-
-  return response.json();
+  if (!response.ok) throw new Error(payload.error || "Live model is unavailable.");
+  return payload;
 }
 
 document.querySelector("#loadSampleButton").addEventListener("click", loadSample);
@@ -329,39 +438,59 @@ document.querySelector("#clearButton").addEventListener("click", () => {
   downloadButton.disabled = true;
   downloadCrosswalkButton.disabled = true;
   latestReport = null;
+  setAnalysisProgress();
+  clearError();
 });
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
+  clearError();
   if (!fields.userAttestation.checked) {
-    alert("Please confirm you are authorized to use these data dictionaries before generating a report.");
+    showError("Please confirm that you are authorized to use these data dictionaries.");
     return;
   }
 
   if (panReferenceMode && (!panReferenceDictionary || panReferenceLoadError)) {
-    alert(panReferenceLoadError || "The PAN reference dictionary is still loading. Please try again in a moment.");
+    showError(panReferenceLoadError || "The PAN reference dictionary is still loading. Please try again in a moment.");
+    return;
+  }
+
+  if (!fields.localDataset.value.trim()) {
+    showError("Add an investigator data dictionary before generating a crosswalk.");
+    return;
+  }
+
+  if (!panReferenceMode && !fields.candidateDatasets.value.trim()) {
+    showError("Add at least one candidate cohort data dictionary before generating a crosswalk.");
     return;
   }
 
   const input = collectInput();
-  const submitButton = form.querySelector("button[type='submit']");
-  submitButton.disabled = true;
-  submitButton.textContent = "Generating...";
+  generateButton.disabled = true;
+  generateButton.textContent = "Generating...";
+  setAnalysisProgress("Comparing the supplied dictionary descriptions and generating the crosswalk...");
 
   try {
     if (panReferenceMode && !usePanReferenceLlm) {
       latestReport = analyzeFeasibility(input);
     } else {
-      latestReport = await requestLlmReport(input);
+      try {
+        latestReport = await requestLlmReport(input);
+      } catch (error) {
+        latestReport = analyzeFeasibility(input);
+        latestReport.llmStatus = "Deterministic comparison used for this report. A live model was not configured or available.";
+      }
     }
-  } catch {
-    latestReport = analyzeFeasibility(input);
+    renderReport(latestReport);
+    setAnalysisProgress("Crosswalk generated. Review the variable-level rows below.");
+    report.scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (error) {
+    showError(error.message || "CohortAI could not generate a crosswalk.");
+    setAnalysisProgress();
   } finally {
-    submitButton.disabled = false;
-    submitButton.textContent = "Generate Crosswalk";
+    generateButton.disabled = false;
+    generateButton.textContent = "Generate Crosswalk";
   }
-
-  renderReport(latestReport);
 });
 
 downloadButton.addEventListener("click", () => {

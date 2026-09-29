@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CohortAI Prototype</title>
+    <title>CohortAI</title>
     <link rel="stylesheet" href="src/styles.css" />
   </head>
   <body>
@@ -13,23 +13,18 @@
           <p class="eyebrow">UACC Research AI</p>
           <h1>CohortAI</h1>
           <p class="lede">
-            Data dictionary comparison for variable descriptions, coding, units, endpoints,
-            and harmonization feasibility across cancer research cohorts.
+            Compare study data dictionaries before deciding whether cohorts can be compared,
+            harmonized, or kept separate.
           </p>
         </div>
-
-        <nav class="mode-tabs" aria-label="CohortAI versions">
-          <a class="mode-tab active" href="index.html">Multi-cohort comparison</a>
-          <a class="mode-tab" href="pan.html">PAN reference comparison</a>
-        </nav>
 
         <section class="status-panel" aria-labelledby="workflow-title">
           <h2 id="workflow-title">Workflow</h2>
           <ol>
-            <li>Define question</li>
-            <li>Upload dictionaries</li>
-            <li>Generate crosswalk</li>
-            <li>Review match types</li>
+            <li>Describe the question</li>
+            <li>Add your dictionary</li>
+            <li>Add candidate dictionaries</li>
+            <li>Review and export the crosswalk</li>
           </ol>
         </section>
       </aside>
@@ -37,8 +32,8 @@
       <section class="workspace">
         <header class="workspace-header">
           <div>
-            <p class="eyebrow" id="modeLabel">Data dictionary comparability</p>
-            <h2 id="pageTitle">Compare variables across cohort data dictionaries</h2>
+            <p class="eyebrow">Multi-cohort comparison</p>
+            <h2>Compare variables across cohort data dictionaries</h2>
           </div>
           <button class="secondary-button" id="loadSampleButton" type="button">Load Sample</button>
         </header>
@@ -66,16 +61,16 @@
 
           <label>
             Investigator data dictionary
-            <input id="localDictionaryFile" class="file-input" type="file" accept=".txt,.csv,.tsv,.json,.yaml,.yml,.md" />
+            <input id="localDictionaryFile" class="file-input" type="file" accept=".pdf,.txt,.csv,.tsv,.json,.yaml,.yml,.md" />
             <span class="file-status" id="localFileStatus">No file uploaded</span>
-            <textarea id="localDataset" rows="7" placeholder="Paste variable names and descriptions from the local cohort data dictionary. Example: response_recist = best overall response by RECIST 1.1; pfs_months = months from treatment start to progression or death."></textarea>
+            <textarea id="localDataset" rows="7" placeholder="Paste variable names, descriptions, coding, units, and timing definitions. Do not include subject-level data."></textarea>
           </label>
 
           <label>
             Candidate public cohort data dictionaries
-            <input id="candidateDictionaryFiles" class="file-input" type="file" accept=".txt,.csv,.tsv,.json,.yaml,.yml,.md" multiple />
+            <input id="candidateDictionaryFiles" class="file-input" type="file" accept=".pdf,.txt,.csv,.tsv,.json,.yaml,.yml,.md" multiple />
             <span class="file-status" id="candidateFileStatus">No files uploaded</span>
-            <textarea id="candidateDatasets" rows="8" placeholder="Paste one public cohort data dictionary per block or line. Include variable name, description, allowed values, units, missingness notes, endpoint definitions, and accession if known."></textarea>
+            <textarea id="candidateDatasets" rows="8" placeholder="Paste one candidate data dictionary per section. Add a heading such as ### Cohort name before each dictionary. Include variable descriptions, coding, units, timing, and endpoint definitions when available."></textarea>
           </label>
 
           <label>
@@ -85,13 +80,15 @@
 
           <label class="attestation">
             <input id="userAttestation" type="checkbox" />
-            <span>I confirm I am authorized to use these data dictionaries for this comparison.</span>
+            <span>I confirm I am authorized to use these metadata/data dictionaries for comparison and am not submitting subject-level data.</span>
           </label>
 
           <div class="actions">
-            <button class="primary-button" type="submit">Generate Crosswalk</button>
+            <button class="primary-button" id="generateButton" type="submit">Generate Crosswalk</button>
             <button class="secondary-button" id="clearButton" type="button">Clear</button>
           </div>
+          <p class="analysis-progress hidden" id="analysisProgress" role="status"></p>
+          <p class="form-error hidden" id="formError" role="alert"></p>
         </form>
       </section>
 
@@ -109,7 +106,7 @@
 
         <div id="emptyState" class="empty-state">
           <strong>No assessment yet</strong>
-          <p>Generate a crosswalk to compare variable definitions, coding, units, and harmonization risk.</p>
+          <p>Upload or paste the dictionaries, then generate a crosswalk to review definitions, coding, units, timing, and harmonization risk.</p>
         </div>
 
         <div id="report" class="report hidden"></div>

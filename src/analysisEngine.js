@@ -974,7 +974,7 @@ function buildProvenance(input, dictionaryParsing) {
     pipelineVersion,
     generatedAt: new Date().toISOString(),
     modelProvider: "prototype rule engine",
-    modelVersion: "LLM adapter not connected yet",
+    modelVersion: "Deterministic dictionary comparison",
     promptVersion: "cohortai-harmonization-rubric-1.0",
     inputFingerprint: createInputFingerprint(input),
     dictionaryScope: "metadata/data dictionaries only; no subject-level data",
@@ -1039,6 +1039,6 @@ export function analyzeFeasibility(input) {
     nextSteps: buildNextSteps(crosswalk),
     provenance: buildProvenance(input, dictionaryParsing),
     disclaimer: "Decision support only. This report does not replace expert biostatistical review and does not grant or substitute for data access approval.",
-    llmStatus: "Prototype professor-aligned rule engine. Connect the validated LLM adapter before production use."
+    llmStatus: "Deterministic dictionary comparison based on the supplied variable names, descriptions, coding, units, and timing details."
   };
 }

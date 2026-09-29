@@ -256,6 +256,22 @@ textarea:focus {
   flex-wrap: wrap;
 }
 
+.analysis-progress,
+.form-error {
+  margin: -6px 0 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  font-weight: 650;
+}
+
+.analysis-progress {
+  color: #506d72;
+}
+
+.form-error {
+  color: #a72d2d;
+}
+
 .primary-button {
   background: #00747c;
   color: white;

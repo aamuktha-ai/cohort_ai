@@ -6,11 +6,13 @@ import { runModelAssessment } from "./src/modelAdapters.js";
 const root = process.cwd();
 const port = Number(process.env.PORT || 5173);
 const host = process.env.HOST || "127.0.0.1";
+const maxRequestBytes = 2 * 1024 * 1024;
 
 const types = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
+  ".mjs": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
   ".csv": "text/csv; charset=utf-8",
   ".svg": "image/svg+xml",
@@ -24,12 +26,37 @@ function sendJson(res, status, payload) {
 
 async function readJsonBody(req) {
   const chunks = [];
+  let length = 0;
 
   for await (const chunk of req) {
+    length += chunk.length;
+    if (length > maxRequestBytes) {
+      const error = new Error("Request is too large. Upload metadata/data dictionaries only, not subject-level data.");
+      error.statusCode = 413;
+      throw error;
+    }
     chunks.push(chunk);
   }
 
   return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
+}
+
+function validateAnalysisInput(input) {
+  if (!input.userAttestation) {
+    const error = new Error("Authorization attestation is required.");
+    error.statusCode = 400;
+    throw error;
+  }
+  if (!String(input.localDataset || "").trim()) {
+    const error = new Error("An investigator data dictionary is required.");
+    error.statusCode = 400;
+    throw error;
+  }
+  if (input.referenceCohort !== "PAN" && !String(input.candidateDatasets || "").trim()) {
+    const error = new Error("At least one candidate cohort data dictionary is required.");
+    error.statusCode = 400;
+    throw error;
+  }
 }
 
 function resolvePath(url) {
@@ -44,6 +71,7 @@ createServer(async (req, res) => {
   try {
     if (req.method === "POST" && url.pathname === "/api/analyze") {
       const input = await readJsonBody(req);
+      validateAnalysisInput(input);
       if (input.referenceCohort === "PAN") {
         const panDictionary = await readFile(join(root, "reference-data", "PAN_Data_Dictionary.csv"), "utf8");
         input.candidateDatasets = `### Precision Aging Network (PAN)\n${panDictionary}`;
