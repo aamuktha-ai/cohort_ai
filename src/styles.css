@@ -26,6 +26,29 @@ textarea {
   grid-template-columns: minmax(230px, 270px) minmax(0, 1fr) minmax(310px, 390px);
 }
 
+@media (min-width: 981px) {
+  body {
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .app-shell {
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .sidebar,
+  .workspace,
+  .report-panel {
+    height: 100dvh;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+}
+
 .sidebar {
   background: #153b3f;
   color: #f7fbfa;
@@ -506,7 +529,7 @@ th {
   color: #344247;
 }
 
-@media (max-width: 1280px) {
+@media (max-width: 980px) {
   .app-shell {
     grid-template-columns: minmax(220px, 250px) minmax(0, 1fr);
   }
